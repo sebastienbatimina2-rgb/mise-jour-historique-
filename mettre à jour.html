@@ -1,0 +1,463 @@
+import os
+import zipfile
+
+# Create project structure
+os.makedirs("loto_590_app/data", exist_ok=True)
+os.makedirs("loto_590_app/.github/workflows", exist_ok=True)
+
+# 1. index.html
+index_html_content = """<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historique & Automation Tirages Loto 5/90</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --border: #334155;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    header {
+      background-color: var(--panel);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .badge-status {
+      font-size: 0.75rem;
+      background-color: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+    }
+
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--subtext);
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .btn-copy {
+      background-color: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+
+    .btn-copy:hover {
+      background-color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-copy:active {
+      transform: translateY(0);
+    }
+
+    .draw-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .draw-card {
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .balls-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ball {
+      background-color: var(--accent);
+      color: #ffffff;
+      font-weight: 700;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .draw-meta {
+      font-size: 0.8rem;
+      color: var(--subtext);
+      text-align: right;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background-color: var(--success);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .toast.visible {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--subtext);
+      background-color: var(--panel);
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <div class="header-top">
+        <h1>Historique Loto 5/90 LNB</h1>
+        <span class="badge-status">● Synchronisé</span>
+      </div>
+      
+      <button class="btn-copy" id="btnCopy" onclick="copierHistorique()">
+        📋 Copier l'historique complet
+      </button>
+
+      <div class="stats-bar">
+        <span>Total tirages : <strong id="totalCount">0</strong></span>
+        <span>Format : <code>xx-xx-xx-xx-xx</code></span>
+      </div>
+    </header>
+
+    <main id="drawList" class="draw-list">
+      <div class="empty-state">Chargement des données en cours...</div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast">✓ Historique copié dans le presse-papier !</div>
+
+  <script>
+    let dataset = [];
+
+    async function chargerHistorique() {
+      try {
+        const res = await fetch('data/tirages.json?v=' + Date.now());
+        if (!res.ok) throw new Error("Fichier introuvable");
+        dataset = await res.json();
+        render();
+      } catch (err) {
+        document.getElementById('drawList').innerHTML = `
+          <div class="empty-state" style="color: #ef4444;">
+            Impossible de charger les données (data/tirages.json non trouvé).
+          </div>
+        `;
+      }
+    }
+
+    function render() {
+      const listEl = document.getElementById('drawList');
+      document.getElementById('totalCount').textContent = dataset.length;
+
+      if (!dataset || dataset.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">Aucun tirage enregistré pour le moment.</div>';
+        return;
+      }
+
+      listEl.innerHTML = dataset.map((item, index) => {
+        const ballsHtml = item.tirage.split('-').map(n => `<div class="ball">${n}</div>`).join('');
+        return `
+          <div class="draw-card">
+            <div class="balls-group">${ballsHtml}</div>
+            <div class="draw-meta">
+              <div>#${dataset.length - index}</div>
+              <div>${item.date || ''}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function copierHistorique() {
+      if (!dataset.length) return;
+
+      // Generer le format exact xx-xx-xx-xx-xx separe par des sauts de ligne
+      const texteFormatte = dataset.map(item => item.tirage).join('\\n');
+
+      navigator.clipboard.writeText(texteFormatte).then(() => {
+        showToast();
+      }).catch(err => {
+        alert("Erreur lors de la copie : " + err);
+      });
+    }
+
+    function showToast() {
+      const toast = document.getElementById('toast');
+      toast.classList.add('visible');
+      setTimeout(() => toast.classList.remove('visible'), 2200);
+    }
+
+    chargerHistorique();
+  </script>
+</body>
+</html>
+"""
+
+with open("loto_590_app/index.html", "w", encoding="utf-8") as f:
+    f.write(index_html_content)
+
+# 2. scraper.py
+scraper_py_content = """import json
+import os
+import re
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
+
+DATA_FILE = "data/tirages.json"
+LNB_URL = "https://www.lnb.bj"  # Modifier selon la page exacte des resultats LNB
+
+def charger_historique():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Erreur de lecture JSON: {e}")
+    return []
+
+def sauvegarder_historique(data):
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def extraire_tirage_lnb():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        response = requests.get(LNB_URL, headers=headers, timeout=15)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            
+            # Recherche des elements contenant les boules du tirage
+            # Adapter la classe CSS selon la structure effective du site LNB
+            elements = soup.find_all("span", class_=re.compile(r"boule|ball|num", re.I))
+            
+            numeros = []
+            for el in elements:
+                val = el.text.strip()
+                if val.isdigit() and 1 <= int(val) <= 90:
+                    numeros.append(val.zfill(2))
+                if len(numeros) == 5:
+                    break
+            
+            if len(numeros) == 5:
+                return "-".join(numeros)
+    except Exception as e:
+        print(f"Erreur lors du scraping : {e}")
+    return None
+
+def main():
+    historique = charger_historique()
+    nouveau_tirage = extraire_tirage_lnb()
+    
+    if nouveau_tirage:
+        # Verification anti-doublon (si le dernier tirage enregistre est different)
+        dernier_enregistre = historique[0]["tirage"] if historique else None
+        
+        if nouveau_tirage != dernier_enregistre:
+            date_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+            nouvel_element = {
+                "tirage": nouveau_tirage,
+                "date": date_str
+            }
+            historique.insert(0, nouvel_element)  # Ajout en haut
+            sauvegarder_historique(historique)
+            print(f" Succes : Nouveau tirage ajoute -> {nouveau_tirage}")
+        else:
+            print(" Info : Le tirage est deja a jour.")
+    else:
+        print(" Attention : Aucun tirage valide n'a pu etre extrait lors de cette session.")
+
+if __name__ == "__main__":
+    main()
+"""
+
+with open("loto_590_app/scraper.py", "w", encoding="utf-8") as f:
+    f.write(scraper_py_content)
+
+# 3. data/tirages.json
+initial_json = """[
+  {
+    "tirage": "12-45-67-08-89",
+    "date": "23/07/2026 08:00"
+  },
+  {
+    "tirage": "04-22-51-66-86",
+    "date": "22/07/2026 18:00"
+  }
+]"""
+
+with open("loto_590_app/data/tirages.json", "w", encoding="utf-8") as f:
+    f.write(initial_json)
+
+# 4. .github/workflows/update.yml
+workflow_content = """name: Auto Update LNB Loto 5/90
+
+on:
+  schedule:
+    # S'execute automatiquement toutes les 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Bouton pour execution manuelle
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
+
+      - name: Run Scraper
+        run: python scraper.py
+
+      - name: Commit and Push if updated
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/tirages.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update tirage 5/90" && git push)
+"""
+
+with open("loto_590_app/.github/workflows/update.yml", "w", encoding="utf-8") as f:
+    f.write(workflow_content)
+
+# 5. README.md
+readme_content = """# Application Historique Loto 5/90 LNB Automatisée
+
+Cette application web monopage s'alimente automatiquement grâce à un bot Python hébergé sur GitHub Actions.
+
+## Structure des fichiers
+
+- `index.html` : Interface web responsive avec bouton de copie instantanée au format `xx-xx-xx-xx-xx`.
+- `scraper.py` : Script d'extraction des tirages LNB et de contrôle de validité.
+- `data/tirages.json` : Base de données JSON contenant l'historique des tirages.
+- `.github/workflows/update.yml` : Planificateur automatique (exécution toutes les 30 minutes).
+
+## Guide de Déploiement Gratuit (GitHub Pages)
+
+1. **Créer un dépôt GitHub** (public) nommé `loto-590-lnb`.
+2. **Déposer tous les fichiers** du projet à la racine du dépôt.
+3. **Autoriser GitHub Actions à écrire dans le dépôt** :
+   - Allez dans **Settings** > **Actions** > **General**.
+   - Dans la section *Workflow permissions*, sélectionnez **Read and write permissions**.
+   - Cliquez sur **Save**.
+4. **Activer GitHub Pages** :
+   - Allez dans **Settings** > **Pages**.
+   - Dans *Source*, choisissez `Deploy from a branch`.
+   - Sélectionnez la branche `main` / `root` et sauvegardez.
+
+L'application sera en ligne et mise à jour automatiquement !
+"""
+
+with open("loto_590_app/README.md", "w", encoding="utf-8") as f:
+    f.write(readme_content)
+
+# Create zip archive
+zip_path = "loto_590_app_complete.zip"
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for root, dirs, files in os.walk("loto_590_app"):
+        for file in files:
+            file_path = os.path.join(root, file)
+            arcname = os.path.relpath(file_path, "loto_590_app")
+            zipf.write(file_path, arcname)
+
+print("Zip archive created successfully:", zip_path)
